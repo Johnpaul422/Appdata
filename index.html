@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Playlist to JSON Generator</title>
+    <style>
+      /* Base styles for all devices */
+body {
+  font-family: Arial, sans-serif;
+  margin: 20px;
+}
+
+#playlistForm {
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+input[type="text"], textarea {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+button {
+  padding: 10px;
+  background-color: #4CAF50;
+  color: white;
+  border: none;
+  cursor: pointer;
+}
+
+button:hover {
+  background-color: #45a049;
+}
+
+.json-output {
+  margin-top: 20px;
+  white-space: pre-wrap;
+  background-color: #f4f4f4;
+  padding: 20px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.playlist {
+  margin-bottom: 20px;
+}
+
+/* Styles for mobile devices */
+@media (max-width: 480px) {
+  body {
+      margin: 10px;
+  }
+
+  button {
+      font-size: 14px;
+  }
+
+  .json-output {
+      font-size: 12px;
+      padding: 15px;
+  }
+}
+
+/* Styles for tablets */
+@media (min-width: 481px) and (max-width: 768px) {
+  body {
+      margin: 15px;
+  }
+
+  button {
+      font-size: 16px;
+  }
+
+  .json-output {
+      font-size: 14px;
+      padding: 15px;
+  }
+}
+
+/* Styles for desktop */
+@media (min-width: 769px) {
+  body {
+      margin: 20px;
+  }
+
+  button {
+      font-size: 18px;
+  }
+
+  .json-output {
+      font-size: 16px;
+      padding: 20px;
+  }
+}
+
+    </style>
+</head>
+<body>
+
+    <h1>YouTube Playlist to JSON Generator</h1>
+
+    <div id="playlistForm">
+        <input type="text" id="apiKey" placeholder="YouTube API Key" />
+        <input type="text" id="playlistId" placeholder="YouTube Playlist ID" />
+        <button onclick="fetchPlaylist()">Fetch Playlist</button>
+    </div>
+
+    <h2>Fetched Playlist Data:</h2>
+    <div id="fetchedPlaylist" class="playlist"></div>
+
+    <h2>Add Video Details:</h2>
+    <div id="videoForm">
+        <input type="text" id="videoTitle" placeholder="Video Title" />
+        <input type="text" id="videoThumbnail" placeholder="Video Thumbnail URL" />
+        <input type="text" id="videoUrl" placeholder="Video URL" />
+        <button onclick="addVideo()">Add Video</button>
+    </div>
+
+    <h2>Generated JSON:</h2>
+    <div id="jsonOutput" class="json-output">{ "meetings": [] }</div>
+    <button id="copyButton" onclick="copyJson()">Copy JSON</button>
+
+    <script>
+        // Initialize empty JSON structure
+        let jsonData = {
+            "meetings": []
+        };
+        
+        // Function to fetch playlist data from YouTube API
+        function fetchPlaylist() {
+            const apiKey = document.getElementById('apiKey').value;
+            const playlistId = document.getElementById('playlistId').value;
+
+            const playlistUrl = `https://www.googleapis.com/youtube/v3/playlists?part=snippet&id=${playlistId}&key=${apiKey}`;
+            const playlistItemsUrl = `https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=${playlistId}&maxResults=50&key=${apiKey}`;
+
+            // Fetch Playlist Metadata (Title, Description, Thumbnail)
+            fetch(playlistUrl)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.items.length === 0) {
+                        alert("Playlist not found.");
+                        return;
+                    }
+
+                    const playlistTitle = data.items[0].snippet.title;
+                    const playlistDescription = data.items[0].snippet.description;
+                    const playlistThumbnail = data.items[0].snippet.thumbnails.high.url;
+
+                    // Fetch Playlist Videos
+                    fetch(playlistItemsUrl)
+                        .then(response => response.json())
+                        .then(videoData => {
+                            const videos = videoData.items.map(video => ({
+                                title: video.snippet.title,
+                                thumbnailUrl: video.snippet.thumbnails.high.url,
+                                videoUrl: `https://www.youtube.com/watch?v=${video.snippet.resourceId.videoId}`
+                            }));
+
+                            // Create new meeting object
+                            const newMeeting = {
+                                title: playlistTitle,
+                                description: playlistDescription,
+                                imageUrl: playlistThumbnail,
+                                videos: videos
+                            };
+
+                            // Add the new meeting to the JSON data
+                            jsonData.meetings.push(newMeeting);
+
+                            // Display the fetched playlist data
+                            displayFetchedPlaylist(newMeeting);
+                            updateJsonOutput();
+                        });
+                })
+                .catch(error => {
+                    console.error('Error fetching playlist data:', error);
+                    alert("Error fetching playlist data.");
+                });
+        }
+
+        // Function to display fetched playlist
+        function displayFetchedPlaylist(meeting) {
+            const fetchedPlaylist = document.getElementById('fetchedPlaylist');
+            fetchedPlaylist.innerHTML += `
+                <div class="playlist">
+                    <strong>${meeting.title}</strong>
+                    <p>${meeting.description}</p>
+                    <img src="${meeting.imageUrl}" alt="${meeting.title} Thumbnail" style="width:200px;" />
+                </div>
+            `;
+        }
+
+        // Add a new video to the playlist
+        function addVideo() {
+            const videoTitle = document.getElementById('videoTitle').value;
+            const videoThumbnail = document.getElementById('videoThumbnail').value;
+            const videoUrl = document.getElementById('videoUrl').value;
+
+            // Assume we add the video to the last meeting for simplicity
+            const lastMeeting = jsonData.meetings[jsonData.meetings.length - 1];
+
+            if (lastMeeting) {
+                lastMeeting.videos.push({
+                    title: videoTitle,
+                    thumbnailUrl: videoThumbnail,
+                    videoUrl: videoUrl
+                });
+
+                // Clear video input fields
+                document.getElementById('videoTitle').value = "";
+                document.getElementById('videoThumbnail').value = "";
+                document.getElementById('videoUrl').value = "";
+
+                alert("Video added successfully!");
+                updateJsonOutput();
+            } else {
+                alert("Please fetch a playlist first.");
+            }
+        }
+
+        // Function to update JSON output
+        function updateJsonOutput() {
+            const jsonOutput = document.getElementById('jsonOutput');
+            jsonOutput.textContent = JSON.stringify(jsonData, null, 2);
+        }
+
+        // Function to copy JSON to clipboard
+        function copyJson() {
+            const jsonOutput = document.getElementById('jsonOutput').textContent;
+            navigator.clipboard.writeText(jsonOutput)
+                .then(() => {
+                    alert("JSON copied to clipboard!");
+                })
+                .catch(err => {
+                    console.error('Failed to copy JSON: ', err);
+                });
+        }
+    </script>
+
+</body>
+</html>
